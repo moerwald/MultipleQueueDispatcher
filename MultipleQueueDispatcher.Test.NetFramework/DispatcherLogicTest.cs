@@ -48,7 +48,7 @@ namespace MultipleQueueDispatcher.Test.NetFramework
 
             _logic.PerformQueueActions();
 
-            _workerMangerMock.Verify(wm => wm.HandleNewItem(It.IsInRange<int>(0, 9, Range.Exclusive)), Times.Exactly(9));
+            _workerMangerMock.Verify(wm => wm.HandleNewItem(It.IsInRange(0, 9, Range.Exclusive)), Times.Exactly(9));
         }
     }
 }

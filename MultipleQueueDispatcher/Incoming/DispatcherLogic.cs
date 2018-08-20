@@ -11,16 +11,18 @@ namespace MultipleQueueDispatcher.Incoming
     {
         private readonly Func<T, TQueueId> _predicateToCreateNewInternalQ;
         private readonly IWorkerManager<T> _workerManager;
-
+        private readonly ITime _time;
         private ConcurrentDictionary<TQueueId, QueueWithIncrementingSequenceNumbers<T>> _qDictionary = new ConcurrentDictionary<TQueueId, QueueWithIncrementingSequenceNumbers<T>>();
 
         public DispatcherLogic(
                     Func<T, TQueueId> predicateToCreateNewInternalQ,
-            IWorkerManager<T> workerManager
+            IWorkerManager<T> workerManager,
+            ITime time
             )
         {
             _predicateToCreateNewInternalQ = predicateToCreateNewInternalQ;
             _workerManager = workerManager;
+            _time = time;
         }
 
         public Func<T, TQueueId> GetQueueId => _predicateToCreateNewInternalQ;
@@ -48,7 +50,7 @@ namespace MultipleQueueDispatcher.Incoming
             if (!_qDictionary.ContainsKey(key))
             {
                 // We need to create a new Q
-                _qDictionary[key] = new QueueWithIncrementingSequenceNumbers<T>(new Time(), TimeSpan.FromSeconds(5));
+                _qDictionary[key] = new QueueWithIncrementingSequenceNumbers<T>(_time, TimeSpan.FromSeconds(5));
             }
             _qDictionary[key].Enqueue(item);
         }

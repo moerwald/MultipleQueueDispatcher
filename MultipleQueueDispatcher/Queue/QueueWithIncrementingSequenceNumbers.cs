@@ -29,14 +29,11 @@ namespace MultipleQueueDispatcher.Queue
 
         public void CopyTo(T[] array, int index)
         {
-                var lst = array.ToList().Select(itm => new QueueEntryMortal<T>(itm, _time.GetUtcNow(), _timeToLive)).ToArray();
-                _q.CopyTo(lst, index);
+            var lst = array.ToList().Select(itm => new QueueEntryMortal<T>(itm, _time.GetUtcNow(), _timeToLive)).ToArray();
+            _q.CopyTo(lst, index);
         }
 
-        public void Enqueue(T item)
-        {
-                _q.Enqueue(new QueueEntryMortal<T>(item, _time.GetUtcNow(), _timeToLive));
-        }
+        public void Enqueue(T item) => _q.Enqueue(new QueueEntryMortal<T>(item, _time.GetUtcNow(), _timeToLive));
 
         public IEnumerator<QueueEntryMortal<T>> GetEnumerator() => _q.GetEnumerator();
 
@@ -71,7 +68,6 @@ namespace MultipleQueueDispatcher.Queue
                 }
 
                 result = entry.Entry;
-
                 return true;
             }
 

@@ -58,6 +58,5 @@ namespace MultipleQueueDispatcher.Test.NetFramework.Queue
             _time.Setup(time => time.GetUtcNow()).Returns(startTime.AddSeconds(5));
             Assert.IsFalse(_q.TryPeek(out var _));
         }
-
     }
 }

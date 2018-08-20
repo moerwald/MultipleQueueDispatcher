@@ -1,12 +1,12 @@
-﻿using MultipleQueueDispatcher.Worker;
+﻿using MultipleQueueDispatcher.Helper;
+using MultipleQueueDispatcher.Queue;
+using MultipleQueueDispatcher.Worker;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
-using MultipleQueueDispatcher.Queue;
-using MultipleQueueDispatcher.Helper;
 
 namespace MultipleQueueDispatcher.Incoming
 {
@@ -42,9 +42,12 @@ namespace MultipleQueueDispatcher.Incoming
         public int NrOfInternalQueues { get => _qDictionary.Count; }
 
         public void DeleteQueue(TQueueId id) => _qDictionary.TryRemove(id, out var _);
+
         public bool IsEmpty(TQueueId queueId) => _qDictionary.ContainsKey(queueId) && _qDictionary[queueId].IsEmpty;
 
         public void Push(T item) => _inputQ.Post(item);
+
+        public void StartScheduling() => _dispatcherTask.Start();
 
         private void HandleNewItem(T item)
         {
@@ -56,8 +59,6 @@ namespace MultipleQueueDispatcher.Incoming
             }
             _qDictionary[key].Enqueue(item);
         }
-
-        public void StartScheduling() => _dispatcherTask.Start();
 
         private void Schedule(CancellationToken token)
         {

@@ -1,64 +1,34 @@
-﻿using MultipleQueueDispatcher.Helper;
-using MultipleQueueDispatcher.Queue;
-using MultipleQueueDispatcher.Worker;
-using System;
-using System.Collections.Concurrent;
-using System.Linq;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 
 namespace MultipleQueueDispatcher.Incoming
 {
-    public class IncomingDispatcher<T, TQueueId> : IDisposable
+    public class DispatcherLogicHost<T, TQueueId> : IDisposable
     {
         public ActionBlock<T> _inputQ;
-
         private readonly Task _dispatcherTask;
-
-        private readonly IWorkerManager<T> _workerManager;
-
         private CancellationTokenSource _cts;
+        private IDispatcherLogic<T, TQueueId> _logic;
 
-        private Func<T, TQueueId> _getQueueId;
-
-        private ConcurrentDictionary<TQueueId, QueueWithIncrementingSequenceNumbers<T>> _qDictionary = new ConcurrentDictionary<TQueueId, QueueWithIncrementingSequenceNumbers<T>>();
-
-        public IncomingDispatcher(Func<T, TQueueId> predicateToCreateNewInternalQ,
+        public DispatcherLogicHost(
             CancellationTokenSource cts,
-            IWorkerManager<T> workerManager)
+            IDispatcherLogic<T, TQueueId> logic)
         {
             // Parameter checks
             _cts = cts ?? throw new ArgumentNullException(nameof(cts));
-            _getQueueId = predicateToCreateNewInternalQ ?? throw new ArgumentNullException(nameof(predicateToCreateNewInternalQ));
-            _workerManager = workerManager ?? throw new ArgumentNullException(nameof(workerManager));
+            _logic = logic;
 
             // Create attributes
-            var token = cts.Token;
             _dispatcherTask = new Task(() => Schedule(_cts.Token));
-            _inputQ = new ActionBlock<T>(item => HandleNewItem(item), new ExecutionDataflowBlockOptions { CancellationToken = cts.Token });
+            _dispatcherTask.Start();
+            _inputQ = new ActionBlock<T>(
+                item => _logic.HandleNewItem(item), 
+                new ExecutionDataflowBlockOptions { CancellationToken = cts.Token, MaxDegreeOfParallelism = 1 });
         }
-
-        public int NrOfInternalQueues { get => _qDictionary.Count; }
-
-        public void DeleteQueue(TQueueId id) => _qDictionary.TryRemove(id, out var _);
-
-        public bool IsEmpty(TQueueId queueId) => _qDictionary.ContainsKey(queueId) && _qDictionary[queueId].IsEmpty;
 
         public void Push(T item) => _inputQ.Post(item);
-
-        public void StartScheduling() => _dispatcherTask.Start();
-
-        private void HandleNewItem(T item)
-        {
-            var key = _getQueueId(item);
-            if (!_qDictionary.ContainsKey(key))
-            {
-                // We need to create a new Q
-                _qDictionary[key] = new QueueWithIncrementingSequenceNumbers<T>(new Time(), TimeSpan.FromSeconds(5));
-            }
-            _qDictionary[key].Enqueue(item);
-        }
 
         private void Schedule(CancellationToken token)
         {
@@ -66,25 +36,17 @@ namespace MultipleQueueDispatcher.Incoming
             {
                 token.ThrowIfCancellationRequested();
 
-                if (_qDictionary.Values.All(q => q.IsEmpty))
+                if (_logic.AreAllQueuesEmpty())
                 {
-                    // All qs empty -> YieldCpu
-                    YieldCpu();
+                    YieldCpuToOtherThread();
                 }
                 else
                 {
-                    // "Round robin" over every q
-                    foreach (var kvp in _qDictionary)
-                    {
-                        if (kvp.Value.TryDequeue(out var item))
-                        {
-                            _workerManager.HandleNewItem(item);
-                        }
-                    }
+                    _logic.PerformQueueActions();
                 }
             }
 
-            void YieldCpu()
+            void YieldCpuToOtherThread()
             {
                 if (!Thread.Yield())
                 {

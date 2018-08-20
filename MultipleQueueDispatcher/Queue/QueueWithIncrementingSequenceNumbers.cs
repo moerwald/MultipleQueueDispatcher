@@ -47,7 +47,8 @@ namespace MultipleQueueDispatcher.Queue
             result = default(T);
             while (_q.TryDequeue(out var entry))
             {
-                if (entry.CalculatedTimeToLive > _time.GetUtcNow())
+                var now = _time.GetUtcNow();
+                if (entry.CalculatedTimeToLive < now)
                 {
                     // Entry died -> get next one
                     continue;
@@ -62,7 +63,7 @@ namespace MultipleQueueDispatcher.Queue
         {
             while (_q.TryPeek(out var entry))
             {
-                if (entry.CalculatedTimeToLive > _time.GetUtcNow())
+                if (entry.CalculatedTimeToLive < _time.GetUtcNow())
                 {
                     // Entry died -> remove it
                     _q.TryDequeue(out var _);
